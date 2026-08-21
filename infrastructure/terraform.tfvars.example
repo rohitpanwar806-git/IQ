@@ -1,0 +1,8 @@
+# Development Environment Configuration
+project_id      = "your-project-id-dev"
+region          = "us-central1"
+firestore_region = "us-central"
+environment     = "dev"
+
+# For production, add your notification channels:
+# notification_channels = ["projects/your-project-id/notificationChannels/1234567890"]

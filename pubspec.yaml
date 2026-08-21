@@ -1,0 +1,89 @@
+name: iq_games
+description: "A free, lightweight mobile game featuring multiple IQ challenges with cloud-based leaderboards."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase & Google Cloud
+  firebase_core: ^2.24.0
+  firebase_auth: ^4.14.0
+  cloud_firestore: ^4.13.0
+  firebase_analytics: ^10.7.0
+  firebase_messaging: ^14.7.0
+  firebase_crashlytics: ^3.4.0
+  firebase_storage: ^11.5.0
+
+  # UI & Navigation
+  flutter_riverpod: ^2.4.0
+  go_router: ^13.0.0
+
+  # State Management (choose one: GetX or Riverpod)
+  # get: ^4.6.6  # Uncomment if using GetX instead of Riverpod
+  
+  # UI Components
+  cupertino_icons: ^1.0.0
+  flutter_animate: ^4.0.0
+
+  # Utilities
+  intl: ^0.19.0
+  connectivity_plus: ^5.0.0
+  shared_preferences: ^2.2.0
+  uuid: ^4.0.0
+
+  # Logging & Debugging
+  logger: ^2.1.0
+  sentry_flutter: ^7.8.0
+
+  # Analytics
+  amplitude_flutter: ^3.1.0
+
+  # Notifications
+  flutter_local_notifications: ^14.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+  
+  # Testing
+  mocktail: ^1.0.0
+  mockito: ^5.4.0
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+
+  # Assets
+  assets:
+    - assets/images/
+    - assets/sounds/
+    - assets/data/
+
+  # Fonts
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+    - family: PlayfairDisplay
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay-Regular.ttf
+        - asset: assets/fonts/PlayfairDisplay-Bold.ttf
+          weight: 700
+
+# Platform-specific configurations
+platforms:
+  android:
+    minSdkVersion: 21
+  ios:
+    minVersion: 11.0

@@ -1,0 +1,187 @@
+name: Infrastructure - Terraform Plan & Apply
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'infrastructure/**'
+      - '.github/workflows/infrastructure-terraform.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'infrastructure/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan'
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CLOUD_CREDENTIALS }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Authenticate with Google Cloud
+        run: |
+          echo "$GOOGLE_CREDENTIALS" | base64 -d > /tmp/gcloud-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcloud-key.json
+      
+      - name: Format check
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+      
+      - name: Initialize Terraform
+        run: terraform init
+      
+      - name: Validate Terraform
+        run: terraform validate
+      
+      - name: Plan Terraform
+        id: plan
+        run: terraform plan -out=tfplan -lock=false
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: us-central1
+          TF_VAR_firestore_region: us-central
+          TF_VAR_environment: dev
+      
+      - name: Upload plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan
+          path: infrastructure/tfplan
+          retention-days: 5
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const tfplan = fs.readFileSync('./infrastructure/tfplan', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '```\nTerraform Plan:\n' + tfplan.substring(0, 3000) + '\n...\n```'
+            });
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CLOUD_CREDENTIALS }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Authenticate with Google Cloud
+        run: |
+          echo "$GOOGLE_CREDENTIALS" | base64 -d > /tmp/gcloud-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcloud-key.json
+      
+      - name: Initialize Terraform
+        run: terraform init
+      
+      - name: Download plan
+        if: github.event_name == 'push'
+        uses: actions/download-artifact@v3
+        with:
+          name: tfplan
+          path: infrastructure/
+      
+      - name: Apply Terraform
+        run: |
+          if [ -f tfplan ]; then
+            terraform apply -lock=false tfplan
+          else
+            terraform apply -auto-approve -lock=false
+          fi
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: us-central1
+          TF_VAR_firestore_region: us-central
+          TF_VAR_environment: dev
+      
+      - name: Output results
+        run: terraform output -json > /tmp/outputs.json
+      
+      - name: Upload outputs
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs
+          path: /tmp/outputs.json
+
+  terraform-destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CLOUD_CREDENTIALS }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Authenticate with Google Cloud
+        run: |
+          echo "$GOOGLE_CREDENTIALS" | base64 -d > /tmp/gcloud-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcloud-key.json
+      
+      - name: Initialize Terraform
+        run: terraform init
+      
+      - name: Destroy resources
+        run: terraform destroy -auto-approve
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: us-central1
+          TF_VAR_firestore_region: us-central
+          TF_VAR_environment: dev
