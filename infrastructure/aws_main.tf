@@ -8,14 +8,15 @@ terraform {
     }
   }
 
-  # Uncomment for remote state storage in S3
-  # backend "s3" {
-  #   bucket         = "your-terraform-state-bucket"
-  #   key            = "iq-games/terraform.tfstate"
-  #   region         = "ap-south-1"
-  #   encrypt        = true
-  #   dynamodb_table = "terraform-locks"
-  # }
+  # Remote state in S3 so infrastructure can be updated safely across runs.
+  # The bucket is created by the "Bootstrap Terraform state bucket" step in
+  # the GitHub Actions workflow before `terraform init`.
+  backend "s3" {
+    bucket  = "iq-games-tfstate-880453910905"
+    key     = "iq-games/terraform.tfstate"
+    region  = "ap-south-1"
+    encrypt = true
+  }
 }
 
 provider "aws" {
@@ -380,6 +381,14 @@ resource "aws_apigatewayv2_integration" "lambda" {
 resource "aws_apigatewayv2_route" "leaderboard" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /leaderboard/{gameId}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+# Catch-all route: forwards every other path/method (POST /leaderboard/{gameId},
+# GET/POST /users, etc.) to the Lambda, which routes internally by path + method.
+resource "aws_apigatewayv2_route" "default" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "$default"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
