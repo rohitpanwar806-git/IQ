@@ -239,7 +239,9 @@ jobs:
           echo "iOS: ${{ needs.build-ios.result }}"
       
       - name: Slack Notification
-        if: failure() && secrets.SLACK_WEBHOOK != ''
+        if: failure() && env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         uses: slackapi/slack-github-action@v1.24.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK }}
