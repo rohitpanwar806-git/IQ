@@ -74,7 +74,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '笨・Terraform plan completed. Infrastructure changes ready for review.'
+              body: 'Terraform plan completed. Infrastructure changes ready for review.'
             });
 
   terraform-apply:
@@ -141,7 +141,7 @@ jobs:
                 issue_number: context.issue.number || 1,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `笨・AWS Infrastructure Deployed\n\n**API Endpoint:** ${outputs.api_endpoint.value}\n**Region:** ap-south-1`
+                body: `AWS Infrastructure Deployed\n\n**API Endpoint:** ${outputs.api_endpoint.value}\n**Region:** ap-south-1`
               });
             } catch(e) {
               console.log('Could not post deployment status');
@@ -247,13 +247,13 @@ jobs:
           webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           payload: |
             {
-              "text": "笞・・IQ Games AWS Deployment Failed",
+              "text": "IQ Games AWS Deployment Failed",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Deployment Status*\n窶｢ Terraform: ${{ needs.terraform-apply.result }}\n窶｢ Android: ${{ needs.build-android.result }}\n窶｢ iOS: ${{ needs.build-ios.result }}"
+                    "text": "*Deployment Status*\n Terraform: ${{ needs.terraform-apply.result }}\n Android: ${{ needs.build-android.result }}\n iOS: ${{ needs.build-ios.result }}"
                   }
                 }
               ]
