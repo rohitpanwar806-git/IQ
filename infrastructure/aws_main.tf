@@ -220,6 +220,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "game_assets" {
     id     = "delete-old-versions"
     status = "Enabled"
 
+    filter {}
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
@@ -372,7 +374,7 @@ resource "aws_apigatewayv2_integration" "lambda" {
   integration_type   = "AWS_PROXY"
   integration_method = "POST"
   payload_format_version = "2.0"
-  target_arn         = aws_lambda_function.leaderboard_api.arn
+  integration_uri    = aws_lambda_function.leaderboard_api.invoke_arn
 }
 
 resource "aws_apigatewayv2_route" "leaderboard" {
