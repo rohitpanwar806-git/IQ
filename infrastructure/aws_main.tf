@@ -185,6 +185,11 @@ resource "aws_cognito_user_pool" "main" {
   tags = {
     Name = "IQ Games User Pool"
   }
+
+  # Cognito forbids changing schema attributes after creation.
+  lifecycle {
+    ignore_changes = [schema]
+  }
 }
 
 # Cognito User Pool Client (for app)
