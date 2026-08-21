@@ -2,6 +2,8 @@
 
 A free, lightweight mobile game featuring multiple IQ challenges with cloud-based leaderboards and score tracking. Available on Google Play Store and Apple App Store.
 
+**Powered by AWS:** DynamoDB, Lambda, API Gateway, and Cognito for serverless scalability.
+
 ## Quick Start
 
 ### 1. Prerequisites
@@ -9,8 +11,7 @@ Before starting, ensure you have:
 - **Flutter SDK** 3.x and **Dart** 3.x installed
 - **Android Studio** with Android SDK 21+ for Android builds
 - **Xcode** 13+ (macOS only) for iOS builds
-- A **Google Cloud Project** with Firestore enabled
-- A **Firebase Project** linked to your Google Cloud Project
+- An **AWS Account** (free tier available, 1 year free)
 - A **Google Play Developer Account** ($25 one-time)
 - An **Apple Developer Program Membership** ($99/year, for App Store publishing)
 

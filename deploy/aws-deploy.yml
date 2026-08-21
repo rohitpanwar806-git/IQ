@@ -1,0 +1,258 @@
+name: AWS - Deploy Infrastructure & Apps
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'infrastructure/aws_*.tf'
+      - 'infrastructure/aws_*.tfvars'
+      - 'infrastructure/lambda_function.py'
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/aws-deploy.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  TERRAFORM_VERSION: 1.5.0
+
+jobs:
+  # ============================================
+  # Terraform Plan & Apply
+  # ============================================
+  terraform-plan:
+    name: Terraform Plan - AWS Infrastructure
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Initialize Terraform
+        run: terraform init -backend=false
+      
+      - name: Validate Terraform
+        run: terraform validate
+      
+      - name: Format check
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+      
+      - name: Plan Terraform
+        id: plan
+        run: terraform plan -var-file=aws_terraform.tfvars -out=tfplan
+      
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: infrastructure/tfplan
+          retention-days: 1
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Terraform plan completed. Infrastructure changes ready for review.'
+            });
+
+  terraform-apply:
+    name: Terraform Apply - Deploy to AWS
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Initialize Terraform
+        run: terraform init -backend=false
+      
+      - name: Download plan artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: terraform-plan
+          path: infrastructure/
+      
+      - name: Package Lambda function
+        run: |
+          cd infrastructure
+          zip -j lambda_function.zip lambda_function.py
+      
+      - name: Apply Terraform
+        run: terraform apply -lock=false tfplan || terraform apply -var-file=aws_terraform.tfvars -auto-approve -lock=false
+      
+      - name: Save outputs
+        run: terraform output -json > /tmp/terraform-outputs.json
+      
+      - name: Upload outputs
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs
+          path: /tmp/terraform-outputs.json
+      
+      - name: Post deployment status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const outputs = JSON.parse(fs.readFileSync('/tmp/terraform-outputs.json', 'utf8'));
+              github.rest.issues.createComment({
+                issue_number: context.issue.number || 1,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `✅ AWS Infrastructure Deployed\n\n**API Endpoint:** ${outputs.api_endpoint.value}\n**Region:** ap-south-1`
+              });
+            } catch(e) {
+              console.log('Could not post deployment status');
+            }
+
+  # ============================================
+  # Flutter App Build
+  # ============================================
+  build-android:
+    name: Build Android App
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build APK
+        run: flutter build apk --release
+      
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+      
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+      
+      - name: Upload App Bundle artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release.aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-latest
+    needs: terraform-apply
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build iOS
+        run: flutter build ios --release --no-codesign
+      
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release.ipa
+          path: build/ios/ipa/iq_games.ipa
+
+  # ============================================
+  # Notifications
+  # ============================================
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [terraform-apply, build-android, build-ios]
+    if: always()
+    
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "=== AWS Deployment Summary ==="
+          echo "Terraform: ${{ needs.terraform-apply.result }}"
+          echo "Android: ${{ needs.build-android.result }}"
+          echo "iOS: ${{ needs.build-ios.result }}"
+      
+      - name: Slack Notification
+        if: failure() && secrets.SLACK_WEBHOOK != ''
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "⚠️ IQ Games AWS Deployment Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Status*\n• Terraform: ${{ needs.terraform-apply.result }}\n• Android: ${{ needs.build-android.result }}\n• iOS: ${{ needs.build-ios.result }}"
+                  }
+                }
+              ]
+            }
