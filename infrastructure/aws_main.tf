@@ -323,7 +323,7 @@ resource "aws_lambda_function" "leaderboard_api" {
   filename         = "lambda_function.zip"
   function_name    = "${local.app_name}-leaderboard-api"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "index.handler"
+  handler         = "lambda_function.handler"
   runtime         = "python3.11"
   timeout         = 30
   memory_size     = 256

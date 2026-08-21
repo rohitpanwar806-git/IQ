@@ -54,6 +54,9 @@ jobs:
         run: terraform fmt -check -recursive
         continue-on-error: true
       
+      - name: Package Lambda function
+        run: zip -j lambda_function.zip lambda_function.py
+      
       - name: Plan Terraform
         id: plan
         run: terraform plan -var-file=aws_terraform.tfvars -out=tfplan
@@ -113,9 +116,7 @@ jobs:
           path: infrastructure/
       
       - name: Package Lambda function
-        run: |
-          cd infrastructure
-          zip -j lambda_function.zip lambda_function.py
+        run: zip -j lambda_function.zip lambda_function.py
       
       - name: Apply Terraform
         run: terraform apply -lock=false tfplan || terraform apply -var-file=aws_terraform.tfvars -auto-approve -lock=false
